@@ -25,33 +25,26 @@ export const { auth, signIn, signOut } = NextAuth({
     providers: [
         Credentials({
             async authorize(credentials) {
-                const parsed = z
-                    .object({
-                        email: z.string().email(),
-                        password: z.string().min(6),
-                    })
+                const parsedCredentials = z
+                    .object({ email: z.string().email(), password: z.string().min(6) })
                     .safeParse(credentials);
 
-                if (!parsed.success) {
-                    console.log('Invalid credentials format');
-                    return null;
+                if (parsedCredentials.success) {
+                    const { email, password } = parsedCredentials.data;
+                    const user = await getUser(email);
+                    if (!user) return null;
+
+                    const passwordsMatch = await bcrypt.compare(password, user.password);
+                    if (passwordsMatch) return user;
                 }
 
-                const { email, password } = parsed.data;
-                const user = await getUser(email);
-                if (!user) {
-                    console.log('User not found');
-                    return null;
-                }
-
-                const passwordsMatch = await bcrypt.compare(password, user.password);
-                if (!passwordsMatch) {
-                    console.log('Wrong password');
-                    return null;
-                }
-
-                return user;
+                return null;
             },
         }),
     ],
+    callbacks: {
+        async redirect({ url, baseUrl }) {
+            return '/dashboard'; // 🔁 Redirige toujours vers /dashboard après login
+        },
+    },
 });
